@@ -36,7 +36,7 @@ public class NioServer {
         selector = Selector.open();
 
 
-        readBuffer = ByteBuffer.allocate(8912);
+        readBuffer = ByteBuffer.allocate(89120);
         serverChannel = ServerSocketChannel.open();
         serverChannel.socket().bind(new InetSocketAddress("127.0.0.1", port));
         serverChannel.configureBlocking(false);
@@ -46,7 +46,7 @@ public class NioServer {
 
     public void listen() throws IOException {
         int select = selector.select();
-        if (select > 0) {
+        if (select >= 0) {
             Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
             while (iterator.hasNext()) {
                 SelectionKey next = iterator.next();
@@ -68,7 +68,14 @@ public class NioServer {
                     SocketChannel channel = (SocketChannel) next.channel();
                     Buffer clear = readBuffer.clear();
                     try {
-                        channel.read(readBuffer);
+                        int read = channel.read(readBuffer);
+                        readBuffer.flip();
+
+                        if (read <= 0 || read >= 8912) {
+                            next.cancel();
+                            channel.close();
+                            return;
+                        }
                     } catch (Exception e) {
                         //logger.error("主动掉线 Connection reset by peer", e);
                         next.cancel();
@@ -86,9 +93,11 @@ public class NioServer {
                 if (next.isWritable()) {
                     SocketChannel channel = (SocketChannel) next.channel();
                     String path = (String) next.attachment();
-                    handler.write(path, channel);
+                    Boolean write = handler.write(path, channel);
+                    if (write) {
+                        channel.register(selector, SelectionKey.OP_READ);
+                    }
 
-                    channel.register(selector, SelectionKey.OP_READ);
                 }
 
 
@@ -96,70 +105,7 @@ public class NioServer {
         }
     }
 
-    /**
-     * 打开连接
-     */
-    public void accept() throws IOException {
-        logger.info("start count:{}," + ai.addAndGet(1));
-        SocketChannel channel = serverChannel.accept();
-        channel.configureBlocking(false);
-//        channel.register(readSelector, SelectionKey.OP_READ);
-        channel.register(selector, SelectionKey.OP_READ);
-    }
 
-
-    /**
-     * 开始读取
-     *
-     * @throws IOException
-     */
-    public void read(Handler<String> handler) throws IOException {
-//        int select = readSelector.select();
-        int select = selector.select();
-        if (select > 0) {
-//            Iterator<SelectionKey> iterator = readSelector.selectedKeys().iterator();
-            Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
-            while (iterator.hasNext()) {
-                SelectionKey next = iterator.next();
-                SocketChannel channel = (SocketChannel) next.channel();
-                Buffer clear = readBuffer.clear();
-
-                int read = channel.read(readBuffer);
-                byte[] content = readBuffer.array();
-                String path = (String) handler.read(content);
-//                next.cancel();
-                iterator.remove();
-                // 转写
-//                SelectionKey writeKey = channel.register(writeSelector, SelectionKey.OP_WRITE);
-                SelectionKey writeKey = channel.register(selector, SelectionKey.OP_WRITE);
-                writeKey.attach(path);
-            }
-        }
-
-    }
-
-    public void write(Handler<String> handler) throws IOException {
-//        int select = writeSelector.select();
-        int select = selector.select();
-        if (select > 0) {
-//            Iterator<SelectionKey> iterator = writeSelector.selectedKeys().iterator();
-            Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
-            while (iterator.hasNext()) {
-                SelectionKey next = iterator.next();
-
-                SocketChannel channel = (SocketChannel) next.channel();
-                String path = (String) next.attachment();
-
-                handler.write(path, channel);
-
-
-                // 转读
-//                next.cancel();
-                channel.close();
-                iterator.remove();
-            }
-        }
-    }
 
 
 }

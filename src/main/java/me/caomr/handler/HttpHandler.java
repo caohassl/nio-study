@@ -26,7 +26,7 @@ public class HttpHandler implements Handler<String> {
     }
 
     @Override
-    public void write(String path, SocketChannel channel) throws IOException {
+    public Boolean write(String path, SocketChannel channel) throws IOException {
         String contentType = FileUtil.contentType(path);
         File file = new File(path);
         byte[] body = null;
@@ -51,11 +51,15 @@ public class HttpHandler implements Handler<String> {
         try {
             channel.write(ByteBuffer.wrap(builder.getHeader()));
             channel.write(ByteBuffer.wrap(body));
+
         } catch (Exception e) {
             channel.close();
             logger.error("something happen", e);
+            return false;
         }
+
         logger.info("count:{}" + ai.addAndGet(1) + ",path:" + path + ",rusult: 200");
+        return true;
 
 
     }
