@@ -17,8 +17,9 @@ public class mainTest {
         NioServer nioServer = new NioServer(port);
         Handler<String> handler = new HttpHandler();
 
-
-        nioServer.listen();
+        while (true) {
+            nioServer.listen();
+        }
 
 
 //        while(true){

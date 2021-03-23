@@ -52,8 +52,7 @@ public class HttpHandler implements Handler<String> {
             channel.write(ByteBuffer.wrap(builder.getHeader()));
             channel.write(ByteBuffer.wrap(body));
         } catch (Exception e) {
-            builder.setStatus(SERVER_ERROR_500);
-            builder.addHeader(CONTENT_LENGTH, 0);
+            channel.close();
             logger.error("something happen", e);
         }
         logger.info("count:{}" + ai.addAndGet(1) + ",path:" + path + ",rusult: 200");

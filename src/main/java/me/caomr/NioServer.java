@@ -8,10 +8,11 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
-import java.nio.channels.*;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.util.Iterator;
-import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class NioServer {
@@ -58,26 +59,37 @@ public class NioServer {
                 //sun.nio.ch.ServerSocketChannelImpl cannot be cast to java.nio.channels.SocketChannel
                 if (next.isAcceptable()) {
                     SocketChannel channel = serverChannel.accept();
+
                     channel.configureBlocking(false);
                     channel.register(selector, SelectionKey.OP_READ);
                 }
+
                 if (next.isReadable()) {
                     SocketChannel channel = (SocketChannel) next.channel();
                     Buffer clear = readBuffer.clear();
-                    int read = channel.read(readBuffer);
+                    try {
+                        channel.read(readBuffer);
+                    } catch (Exception e) {
+                        //logger.error("主动掉线 Connection reset by peer", e);
+                        next.cancel();
+                        channel.close();
+                        return;
+                    }
+
                     byte[] content = readBuffer.array();
                     String path = handler.read(content);
                     // 转写
                     SelectionKey writeKey = channel.register(selector, SelectionKey.OP_WRITE);
                     writeKey.attach(path);
                 }
+
                 if (next.isWritable()) {
                     SocketChannel channel = (SocketChannel) next.channel();
                     String path = (String) next.attachment();
                     handler.write(path, channel);
-                    channel.close();
+
+                    channel.register(selector, SelectionKey.OP_READ);
                 }
-//                next.cancel();
 
 
             }
